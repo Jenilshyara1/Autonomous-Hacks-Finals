@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import axios from 'axios';
 import { FileUpload } from './FileUpload';
 import { Download, Shield, ShieldAlert, CheckCircle2, LogOut } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
@@ -27,15 +28,36 @@ export const Dashboard = () => {
                     <p className="text-slate-500 mt-2">Welcome, {user?.username || 'User'}</p>
                 </div>
                 <div className="flex gap-4">
-                    <a
-                        href="http://localhost:8000/api/v1/export"
-                        target="_blank"
-                        rel="noopener noreferrer"
+                    <button
+                        onClick={async () => {
+                            try {
+                                const response = await axios.get('/api/v1/export', {
+                                    responseType: 'blob',
+                                    headers: {
+                                        // The token is automatically handled by the interceptor if setup, 
+                                        // or we grab it from localStorage if that's how this app works.
+                                        // Based on useAuth usage, it likely sets the default header.
+                                        // If not, we might need: 'Authorization': `Bearer ${localStorage.getItem('token')}`
+                                    }
+                                });
+                                const url = window.URL.createObjectURL(new Blob([response.data]));
+                                const link = document.createElement('a');
+                                link.href = url;
+                                link.setAttribute('download', 'privilege_log.csv');
+                                document.body.appendChild(link);
+                                link.click();
+                                link.remove();
+                                window.URL.revokeObjectURL(url);
+                            } catch (error) {
+                                console.error("Export failed", error);
+                                alert("Failed to download CSV. Please try again.");
+                            }
+                        }}
                         className="inline-flex items-center gap-2 px-4 py-2 bg-white border border-slate-300 text-slate-700 rounded-lg hover:bg-slate-50 transition-colors font-medium text-sm"
                     >
                         <Download className="w-4 h-4" />
                         Download CSV
-                    </a>
+                    </button>
                     <button
                         onClick={logout}
                         className="inline-flex items-center gap-2 px-4 py-2 bg-slate-900 text-white rounded-lg hover:bg-slate-800 transition-colors font-medium text-sm"

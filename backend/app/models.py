@@ -14,8 +14,11 @@ class Email(Base):
     subject: Mapped[Optional[str]] = mapped_column()
     body: Mapped[Optional[str]] = mapped_column(Text)
     
-    # Relationship
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id"), nullable=True)
+
+    # Relationships
     privilege_log: Mapped[Optional["PrivilegeLog"]] = relationship(back_populates="email", uselist=False)
+    user: Mapped["User"] = relationship()
 
 class PrivilegeLog(Base):
     __tablename__ = "privilege_logs"

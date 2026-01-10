@@ -9,6 +9,7 @@ interface FileUploadProps {
 export const FileUpload: React.FC<FileUploadProps> = ({ onUploadComplete }) => {
     const [isDragging, setIsDragging] = useState(false);
     const [isUploading, setIsUploading] = useState(false);
+    const [uploadStatus, setUploadStatus] = useState<string>("");
     const [error, setError] = useState<string | null>(null);
 
     const handleDragOver = (e: React.DragEvent) => {
@@ -26,46 +27,68 @@ export const FileUpload: React.FC<FileUploadProps> = ({ onUploadComplete }) => {
         setIsDragging(false);
         const files = e.dataTransfer.files;
         if (files.length > 0) {
-            handleUpload(files[0]);
+            handleUpload(files);
         }
     };
 
     const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
         if (e.target.files && e.target.files.length > 0) {
-            handleUpload(e.target.files[0]);
+            handleUpload(e.target.files);
         }
     };
 
-    const handleUpload = async (file: File) => {
-        if (!file) return;
-
-        // Validate type
-        const validTypes = ['.eml', '.txt'];
-        const extension = file.name.substring(file.name.lastIndexOf('.')).toLowerCase();
-        if (!validTypes.includes(extension)) {
-            setError("Invalid file type. Please upload .eml or .txt");
-            return;
-        }
+    const handleUpload = async (files: FileList) => {
+        if (!files || files.length === 0) return;
 
         setIsUploading(true);
         setError(null);
 
-        const formData = new FormData();
-        formData.append('file', file);
+        const validTypes = ['.eml', '.txt'];
+        const fileArray = Array.from(files);
 
-        try {
-            // Assuming Vite proxy redirects /api to backend
-            const response = await axios.post('/api/v1/upload', formData, {
-                headers: {
-                    'Content-Type': 'multipart/form-data',
-                },
-            });
-            onUploadComplete(response.data);
-        } catch (err: any) {
-            console.error(err);
-            setError(err.response?.data?.detail || "Upload failed. Please try again.");
-        } finally {
-            setIsUploading(false);
+        let processedCount = 0;
+        let errorCount = 0;
+        const totalFiles = fileArray.length;
+
+        setUploadStatus(`Preparing to upload ${totalFiles} files...`);
+
+        const uploadPromises = fileArray.map(async (file) => {
+            const extension = file.name.substring(file.name.lastIndexOf('.')).toLowerCase();
+
+            if (!validTypes.includes(extension)) {
+                errorCount++;
+                processedCount++;
+                setUploadStatus(`Processed ${processedCount}/${totalFiles} files...`);
+                return Promise.reject("Invalid file type");
+            }
+
+            const formData = new FormData();
+            formData.append('file', file);
+
+            try {
+                const response = await axios.post('/api/v1/upload', formData, {
+                    headers: { 'Content-Type': 'multipart/form-data' },
+                });
+                onUploadComplete(response.data);
+                processedCount++;
+                setUploadStatus(`Processed ${processedCount}/${totalFiles} files...`);
+                return response.data;
+            } catch (err) {
+                console.error(err);
+                errorCount++;
+                processedCount++;
+                setUploadStatus(`Processed ${processedCount}/${totalFiles} files...`);
+                throw err;
+            }
+        });
+
+        await Promise.allSettled(uploadPromises);
+
+        setIsUploading(false);
+        setUploadStatus("");
+
+        if (errorCount > 0) {
+            setError(`Completed with ${errorCount} error(s).`);
         }
     };
 
@@ -85,6 +108,7 @@ export const FileUpload: React.FC<FileUploadProps> = ({ onUploadComplete }) => {
                     className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
                     onChange={handleFileSelect}
                     accept=".eml,.txt"
+                    multiple
                     disabled={isUploading}
                 />
 
@@ -99,10 +123,10 @@ export const FileUpload: React.FC<FileUploadProps> = ({ onUploadComplete }) => {
 
                     <div className="space-y-1">
                         <h3 className="text-lg font-semibold text-slate-900">
-                            {isUploading ? 'Processing Email...' : 'Upload Email File'}
+                            {isUploading ? uploadStatus : 'Upload Email Files'}
                         </h3>
                         <p className="text-sm text-slate-500">
-                            Drag and drop or click to upload (.eml or .txt)
+                            Drag and drop or click to upload multiple (.eml or .txt) files
                         </p>
                     </div>
                 </div>

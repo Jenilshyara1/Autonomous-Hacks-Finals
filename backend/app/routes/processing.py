@@ -3,7 +3,8 @@ from fastapi.responses import StreamingResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
 from ..database import get_db
-from ..models import Email, PrivilegeLog
+from ..routes.auth import get_current_user
+from ..models import Email, PrivilegeLog, User
 from ..schemas import EmailInput, ProcessingResult
 from ..parsing import extract_metadata
 from ..chains import get_judge_chain, get_writer_chain, get_redactor_chain
@@ -13,7 +14,7 @@ import csv
 
 router = APIRouter()
 
-async def process_and_save_email(text: str, metadata_override: dict, db: AsyncSession) -> ProcessingResult:
+async def process_and_save_email(text: str, metadata_override: dict, db: AsyncSession, user_id: int | None = None) -> ProcessingResult:
     """
     Shared logic to process email text, run chains, and save to DB.
     metadata_override can contain keys: Date, From, To, Subject
@@ -21,7 +22,7 @@ async def process_and_save_email(text: str, metadata_override: dict, db: AsyncSe
     # 1. Metadata Extraction (Deterministic) from text
     metadata = extract_metadata(text)
     
-    # 2. Merge with specific overrides
+    # ... (unchanged metadata merge logic) ...
     for k, v in metadata_override.items():
         if v:
             metadata[k] = v
@@ -77,6 +78,7 @@ async def process_and_save_email(text: str, metadata_override: dict, db: AsyncSe
         recipient=recipient,
         subject=subject,
         body=text,
+        user_id=user_id
     )
     db.add(db_email)
     await db.commit()
@@ -103,7 +105,11 @@ async def process_and_save_email(text: str, metadata_override: dict, db: AsyncSe
     )
 
 @router.post("/analyze", response_model=ProcessingResult)
-async def analyze_email(email_input: EmailInput, db: AsyncSession = Depends(get_db)):
+async def analyze_email(
+    email_input: EmailInput, 
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
     """
     Existing JSON endpoint.
     """
@@ -113,10 +119,14 @@ async def analyze_email(email_input: EmailInput, db: AsyncSession = Depends(get_
     if email_input.recipient: overrides["To"] = email_input.recipient
     if email_input.subject: overrides["Subject"] = email_input.subject
     
-    return await process_and_save_email(email_input.text, overrides, db)
+    return await process_and_save_email(email_input.text, overrides, db, user_id=current_user.id)
 
 @router.post("/upload", response_model=ProcessingResult)
-async def upload_email(file: UploadFile = File(...), db: AsyncSession = Depends(get_db)):
+async def upload_email(
+    file: UploadFile = File(...), 
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
     """
     Upload .eml or .txt file to be processed.
     """
@@ -158,16 +168,23 @@ async def upload_email(file: UploadFile = File(...), db: AsyncSession = Depends(
         text_body = content.decode(errors="replace")
         metadata["Subject"] = filename
     
-    return await process_and_save_email(text_body, metadata, db)
+    return await process_and_save_email(text_body, metadata, db, user_id=current_user.id)
 
 @router.get("/export")
-async def export_privilege_log(db: AsyncSession = Depends(get_db)):
+async def export_privilege_log(
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
     """
     Generate CSV of the privilege log.
     Async DB query.
     """
-    # Async Query
-    query = select(Email, PrivilegeLog).join(PrivilegeLog, Email.id == PrivilegeLog.email_id)
+    # Async Query filtered by user
+    query = (
+        select(Email, PrivilegeLog)
+        .join(PrivilegeLog, Email.id == PrivilegeLog.email_id)
+        .where(Email.user_id == current_user.id)
+    )
     result = await db.execute(query)
     results = result.all()
     
