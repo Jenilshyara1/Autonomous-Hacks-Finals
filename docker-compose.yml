@@ -1,4 +1,28 @@
+version: '3.8'
+
 services:
+  backend:
+    build: ./backend
+    container_name: backend-app
+    restart: unless-stopped
+    ports:
+      - "8000:8000"
+    depends_on:
+      - postgres
+    env_file:
+      - ./backend/.env
+    environment:
+      - DATABASE_URL=postgresql://postgres:postgres@postgres:5432/mydb
+
+  frontend:
+    build: ./frontend
+    container_name: frontend-app
+    restart: unless-stopped
+    ports:
+      - "5173:80"
+    depends_on:
+      - backend
+
   postgres:
     image: postgres
     container_name: postgres-db
@@ -10,7 +34,7 @@ services:
     ports:
       - "5432:5432"
     volumes:
-      - pgdata:/var/lib/postgresql
+      - pgdata:/var/lib/postgresql/data
 
 volumes:
   pgdata:
