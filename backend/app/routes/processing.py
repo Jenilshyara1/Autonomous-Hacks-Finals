@@ -1,6 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File
 from fastapi.responses import StreamingResponse
-from sqlalchemy.orm import Session
+from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.future import select
 from ..database import get_db
 from ..models import Email, PrivilegeLog
 from ..schemas import EmailInput, ProcessingResult
@@ -12,17 +13,15 @@ import csv
 
 router = APIRouter()
 
-async def process_and_save_email(text: str, metadata_override: dict, db: Session) -> ProcessingResult:
+async def process_and_save_email(text: str, metadata_override: dict, db: AsyncSession) -> ProcessingResult:
     """
     Shared logic to process email text, run chains, and save to DB.
     metadata_override can contain keys: Date, From, To, Subject
     """
     # 1. Metadata Extraction (Deterministic) from text
-    # note: if it's an .eml, the body might not contain headers, so we rely on metadata_override
     metadata = extract_metadata(text)
     
     # 2. Merge with specific overrides
-    # logic: override takes precedence
     for k, v in metadata_override.items():
         if v:
             metadata[k] = v
@@ -30,19 +29,19 @@ async def process_and_save_email(text: str, metadata_override: dict, db: Session
     sender = metadata.get("From", "Unknown")
     recipient = metadata.get("To", "Unknown")
     subject = metadata.get("Subject", "No Subject")
-    date_val = metadata.get("Date") # Could be string
+    date_val = metadata.get("Date") 
     
     # 3. Privilege Classification
     judge_chain = get_judge_chain()
     try:
-        judge_result = judge_chain.invoke({
+        # ASYNC LANGCHAIN CALL
+        judge_result = await judge_chain.ainvoke({
             "sender": sender,
             "recipient": recipient,
             "subject": subject,
             "body": text
         })
     except Exception as e:
-        # Fallback or re-raise
         print(f"Error in judge chain: {e}")
         raise HTTPException(status_code=500, detail=f"LLM Classification Error: {str(e)}")
 
@@ -57,7 +56,8 @@ async def process_and_save_email(text: str, metadata_override: dict, db: Session
     if is_privileged:
         # Writer
         writer_chain = get_writer_chain()
-        writer_result = writer_chain.invoke({
+        # ASYNC LANGCHAIN CALL
+        writer_result = await writer_chain.ainvoke({
             "reasoning": reasoning,
             "body": text
         })
@@ -65,17 +65,13 @@ async def process_and_save_email(text: str, metadata_override: dict, db: Session
 
         # Redactor
         redactor_chain = get_redactor_chain()
-        redactor_result = redactor_chain.invoke({
+        # ASYNC LANGCHAIN CALL
+        redactor_result = await redactor_chain.ainvoke({
             "body": text
         })
         redaction_items = redactor_result.get("items", [])
 
-    # 5. Save to DB
-    # Note: 'date' field in Email model is datetime. Parsing string to datetime is complex. 
-    # For now we'll skip complex date parsing or just use current time if default.
-    # If we really want to save the date from metadata, we need a parser.
-    # We will leave the default (now) or improve this later.
-    
+    # 5. Save to DB (Async)
     db_email = Email(
         sender=sender,
         recipient=recipient,
@@ -83,8 +79,8 @@ async def process_and_save_email(text: str, metadata_override: dict, db: Session
         body=text,
     )
     db.add(db_email)
-    db.commit()
-    db.refresh(db_email)
+    await db.commit()
+    await db.refresh(db_email)
 
     db_log = PrivilegeLog(
         email_id=db_email.id,
@@ -95,7 +91,7 @@ async def process_and_save_email(text: str, metadata_override: dict, db: Session
         redacted_text=str(redaction_items) if redaction_items else None
     )
     db.add(db_log)
-    db.commit()
+    await db.commit()
 
     return ProcessingResult(
         metadata=metadata,
@@ -107,7 +103,7 @@ async def process_and_save_email(text: str, metadata_override: dict, db: Session
     )
 
 @router.post("/analyze", response_model=ProcessingResult)
-async def analyze_email(email_input: EmailInput, db: Session = Depends(get_db)):
+async def analyze_email(email_input: EmailInput, db: AsyncSession = Depends(get_db)):
     """
     Existing JSON endpoint.
     """
@@ -120,7 +116,7 @@ async def analyze_email(email_input: EmailInput, db: Session = Depends(get_db)):
     return await process_and_save_email(email_input.text, overrides, db)
 
 @router.post("/upload", response_model=ProcessingResult)
-async def upload_email(file: UploadFile = File(...), db: Session = Depends(get_db)):
+async def upload_email(file: UploadFile = File(...), db: AsyncSession = Depends(get_db)):
     """
     Upload .eml or .txt file to be processed.
     """
@@ -133,23 +129,18 @@ async def upload_email(file: UploadFile = File(...), db: Session = Depends(get_d
     if filename.endswith(".eml"):
         msg = email.message_from_bytes(content)
         
-        # Extract headers
         metadata["Subject"] = msg.get("Subject", "No Subject")
         metadata["From"] = msg.get("From", "Unknown")
         metadata["To"] = msg.get("To", "Unknown")
         metadata["Date"] = msg.get("Date")
         
-        # Extract body
         if msg.is_multipart():
             for part in msg.walk():
-                # prefer plain text
                 if part.get_content_type() == "text/plain":
                     payload = part.get_payload(decode=True)
                     if payload:
                         text_body = payload.decode(errors="replace")
                         break
-            # if no plain text found, try html or just take first part? 
-            # Fallback: if body empty, try to get anything
             if not text_body:
                  for part in msg.walk():
                     if part.get_content_maintype() == 'text':
@@ -170,25 +161,23 @@ async def upload_email(file: UploadFile = File(...), db: Session = Depends(get_d
     return await process_and_save_email(text_body, metadata, db)
 
 @router.get("/export")
-def export_privilege_log(db: Session = Depends(get_db)):
+async def export_privilege_log(db: AsyncSession = Depends(get_db)):
     """
     Generate CSV of the privilege log.
-    Columns: DocID, Date, Author, Recipient, Privilege Type, Description
+    Async DB query.
     """
-    # Join Email and PrivilegeLog
-    results = db.query(Email, PrivilegeLog).join(PrivilegeLog, Email.id == PrivilegeLog.email_id).all()
+    # Async Query
+    query = select(Email, PrivilegeLog).join(PrivilegeLog, Email.id == PrivilegeLog.email_id)
+    result = await db.execute(query)
+    results = result.all()
     
     output = io.StringIO()
     writer = csv.writer(output)
     
-    # Header
     writer.writerow(["DocID", "Date", "Author", "Recipient", "Privilege Type", "Description"])
     
     for email_row, log_row in results:
-        # Format DocID: CTRL + 6 digits padded ID
         doc_id = f"CTRL{email_row.id:06d}"
-        
-        # Date: simple formatting
         date_str = email_row.date.strftime("%Y-%m-%d") if email_row.date else ""
         
         writer.writerow([

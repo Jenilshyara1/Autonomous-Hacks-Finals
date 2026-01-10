@@ -9,3 +9,5 @@ python-dotenv
 alembic
 langchain-google-genai
 python-multipart
+asyncpg
+greenlet
