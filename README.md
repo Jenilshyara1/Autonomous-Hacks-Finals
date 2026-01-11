@@ -8,7 +8,35 @@ This documentation explains how to set up and run both the Backend and Frontend 
 - **Python** (v3.8+)
 - **PostgreSQL** (installed and running)
 
-## 1. Backend Setup
+## Key Features
+
+- **AI-Powered Analysis**: Uses Google Gemini to automatically classify emails and generate privilege logs.
+- **User Isolation**: Secure multi-user environment ensures data privacy.
+- **Full Stack Architecture**: Interactive React frontend and robust FastAPI backend.
+- **Dockerized**: Easy deployment with Docker Compose.
+
+## System Architecture
+
+See the [Flow Diagram](flow_diagram.md) for a visual overview of the processing pipeline.
+
+## 1. Quick Start (Docker Compose)
+
+The easiest way to run the entire application (Frontend + Backend + Database) is using Docker Compose.
+
+1.  **Configure Environment**:
+    - Ensure you have a `backend/.env` file with `GOOGLE_API_KEY`.
+
+2.  **Build and Run**:
+    ```bash
+    docker-compose up --build
+    ```
+
+- **Frontend**: `http://localhost:5173`
+- **Backend API**: `http://localhost:8000`
+
+---
+
+## 2. Manual Backend Setup
 
 The backend is built with FastAPI and uses SQLAlchemy/Alembic for database management.
 
@@ -62,7 +90,7 @@ uvicorn app.main:app --reload
 
 ---
 
-## 2. Frontend Setup
+## 3. Manual Frontend Setup
 
 The frontend is a React application built with Vite and Tailwind CSS.
 
@@ -90,7 +118,8 @@ npm run dev
 
 ## Summary of Commands
 
-| Server | Terminal 1 (Backend) | Terminal 2 (Frontend) |
+| Method | Command | Notes |
 | :--- | :--- | :--- |
-| **Directory** | `cd backend` | `cd frontend` |
-| **Start** | `uvicorn app.main:app --reload` | `npm run dev` |
+| **Docker** | `docker-compose up --build` | Runs everything |
+| **Manual Backend** | `uvicorn app.main:app --reload` | Run in `backend/` dir |
+| **Manual Frontend** | `npm run dev` | Run in `frontend/` dir |

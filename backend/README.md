@@ -63,6 +63,26 @@ This project implements an AI-powered pipeline to automate the creation of "Priv
         alembic upgrade head
         ```
 
+## Authentication
+
+All API endpoints (except documentation) are protected and require a valid JWT token.
+
+**Header:** `Authorization: Bearer <your_token>`
+
+## Docker Support
+
+You can run the backend in a Docker container.
+
+1.  **Build the image:**
+    ```bash
+    docker build -t privilege-backend .
+    ```
+
+2.  **Run the container:**
+    ```bash
+    docker run -p 8000:8000 --env-file .env privilege-backend
+    ```
+
 ## Usage
 
 ### Running the API Server
@@ -83,6 +103,11 @@ Interactive API docs (Swagger UI) are available at:
 ### Key Endpoint: Analyze Email
 
 **POST** `/api/v1/analyze`
+
+**Headers:**
+```
+Authorization: Bearer <your_token>
+```
 
 **Request Body:**
 ```json
@@ -107,6 +132,7 @@ Interactive API docs (Swagger UI) are available at:
   }
 }
 ```
+
 
 ## Testing
 
