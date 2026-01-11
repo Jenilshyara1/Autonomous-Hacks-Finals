@@ -1,0 +1,15 @@
+Subject: Legal Review: Cloud Services Agreement
+From: inhouse.counsel@corp.com
+To: cto@corp.com
+Date: 2023-11-04
+
+Hi CTO,
+
+I've reviewed the Master Services Agreement from AWS. I have significant concerns about the limitation of liability clause (Section 9). It currently caps their liability at 6 months of fees, which is insufficient given the sensitive data we are storing.
+
+I have redlined the document to request a cap of 3x annual fees or $1M, whichever is higher. 
+
+Please do not sign the current version.
+
+Thanks,
+Legal

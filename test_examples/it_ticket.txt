@@ -1,0 +1,16 @@
+Subject: Ticket #404: Laptop Screen Flickering
+From: employee@corp.com
+To: support@corp.com
+Date: 2023-11-05
+
+Hello IT,
+
+My laptop screen keeps flickering when I unplug the power adapter. It seems to be a hardware issue. 
+
+Model: Dell XPS 15
+Asset Tag: 10234
+
+Can someone take a look at it tomorrow?
+
+Thanks,
+Employee

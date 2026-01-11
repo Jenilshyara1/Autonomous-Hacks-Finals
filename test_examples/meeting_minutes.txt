@@ -1,0 +1,18 @@
+Subject: Weekly Ops Meeting Notes
+From: ops.manager@corp.com
+To: all.staff@corp.com
+Date: 2023-11-03
+
+Hi Everyone,
+
+Here are the notes from today's standup:
+- Warehouse inventory count starts next Monday.
+- New coffee machine installed in the break room.
+- Annual holiday party is scheduled for Dec 15th.
+
+Action Items:
+- Sarah to order more printer paper.
+- Mike to fix the leaky faucet in the kitchen.
+
+Thanks,
+Manager
