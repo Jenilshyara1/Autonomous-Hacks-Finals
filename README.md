@@ -1,6 +1,15 @@
-# Autonomous Hacks Finals - Project Setup
+# PrivLogix - Project Setup
 
-This documentation explains how to set up and run both the Backend and Frontend servers for the Autonomous Hacks Finals project.
+This documentation explains how to set up and run both the Backend and Frontend servers for the PrivLogix project.
+
+## Problem Statement
+
+In major litigation and compliance audits, **Privilege Review** is a critical bottleneck. Legal teams must sift through thousands of documents to identify attorney-client privileged communications—a process that is:
+- **Costly**: Consuming hundreds of billable hours.
+- **Slow**: Delaying discovery and case strategy.
+- **Inconsistent**: Prone to human error and fatigue.
+
+**PrivLogix** addresses this by automating the privilege logging workflow. We leverage **Google Gemini** (LLM) to intelligently analyze emails, determine privilege status (Attorney-Client, Work Product), and automatically generate a defensive **Privilege Log**. This transforms a manual, high-cost burden into a streamlined, AI-assisted process, ensuring accuracy and speed while keeping data secure.
 
 ## Prerequisites
 
